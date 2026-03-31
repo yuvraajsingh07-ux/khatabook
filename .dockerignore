@@ -1,0 +1,10 @@
+node_modules
+.git
+.gitignore
+dist
+tmp
+*.log
+.env
+.env.*
+!.env.example
+attached_assets
