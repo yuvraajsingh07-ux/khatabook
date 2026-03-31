@@ -1,22 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Khata Payment Ledger API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: ledgers
+    description: Ledger (party/cash book) management
+  - name: entries
+    description: Transaction entry management
+  - name: summary
+    description: Summary and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,296 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /ledgers:
+    get:
+      operationId: getLedgers
+      tags: [ledgers]
+      summary: Get all ledgers with current balances
+      responses:
+        "200":
+          description: List of ledgers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerWithBalance"
+    post:
+      operationId: createLedger
+      tags: [ledgers]
+      summary: Create a new ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLedgerInput"
+      responses:
+        "201":
+          description: Created ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ledger"
+
+  /ledgers/{ledgerId}:
+    get:
+      operationId: getLedger
+      tags: [ledgers]
+      summary: Get a single ledger
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ledger detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerWithBalance"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateLedger
+      tags: [ledgers]
+      summary: Update ledger name, profile, or fifo setting
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLedgerInput"
+      responses:
+        "200":
+          description: Updated ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ledger"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteLedger
+      tags: [ledgers]
+      summary: Delete a ledger and all its entries
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /ledgers/{ledgerId}/entries:
+    get:
+      operationId: getEntries
+      tags: [entries]
+      summary: Get all entries for a ledger
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Entry"
+    post:
+      operationId: createEntry
+      tags: [entries]
+      summary: Create a new entry (credit/debit/transfer)
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntryInput"
+      responses:
+        "201":
+          description: Created entry (or array of entries for transfers)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Entry"
+                  - type: array
+                    items:
+                      $ref: "#/components/schemas/Entry"
+
+  /ledgers/{ledgerId}/entries/{entryId}:
+    patch:
+      operationId: updateEntry
+      tags: [entries]
+      summary: Update an entry
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEntryInput"
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteEntry
+      tags: [entries]
+      summary: Delete an entry
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /ledgers/{ledgerId}/summary:
+    get:
+      operationId: getLedgerSummary
+      tags: [summary]
+      summary: Get summary totals for a ledger (total credit, debit, balance)
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ledger summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerSummary"
+
+  /ledgers/{ledgerId}/fifo-status:
+    get:
+      operationId: getFifoStatus
+      tags: [summary]
+      summary: Get FIFO status showing oldest unpaid bills and their remaining amounts
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: FIFO status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FifoStatus"
+
+  /ledgers/{ledgerId}/remarks:
+    get:
+      operationId: getPastRemarks
+      tags: [entries]
+      summary: Get list of past remarks for autocomplete
+      parameters:
+        - name: ledgerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Past remarks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /overview:
+    get:
+      operationId: getOverview
+      tags: [summary]
+      summary: Get overall stats across all ledgers
+      responses:
+        "200":
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +326,234 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    LedgerProfile:
+      type: object
+      properties:
+        phone:
+          type: string
+          nullable: true
+        upiId:
+          type: string
+          nullable: true
+        bankAccount:
+          type: string
+          nullable: true
+        ifsc:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    Ledger:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        fifoEnabled:
+          type: boolean
+        profile:
+          $ref: "#/components/schemas/LedgerProfile"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, fifoEnabled, createdAt, updatedAt]
+
+    LedgerWithBalance:
+      allOf:
+        - $ref: "#/components/schemas/Ledger"
+        - type: object
+          properties:
+            balance:
+              type: number
+            totalCredit:
+              type: number
+            totalDebit:
+              type: number
+            entryCount:
+              type: integer
+          required: [balance, totalCredit, totalDebit, entryCount]
+
+    CreateLedgerInput:
+      type: object
+      properties:
+        name:
+          type: string
+        fifoEnabled:
+          type: boolean
+        profile:
+          $ref: "#/components/schemas/LedgerProfile"
+      required: [name]
+
+    UpdateLedgerInput:
+      type: object
+      properties:
+        name:
+          type: string
+        fifoEnabled:
+          type: boolean
+        profile:
+          $ref: "#/components/schemas/LedgerProfile"
+
+    Entry:
+      type: object
+      properties:
+        id:
+          type: string
+        ledgerId:
+          type: string
+        date:
+          type: string
+          format: date
+        remark:
+          type: string
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [credit, debit, transfer]
+        transferToLedgerId:
+          type: string
+          nullable: true
+        transferToLedgerName:
+          type: string
+          nullable: true
+        linkedTransferId:
+          type: string
+          nullable: true
+        fifoRemaining:
+          type: number
+          nullable: true
+        balance:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, ledgerId, date, remark, amount, type, balance, createdAt]
+
+    CreateEntryInput:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        remark:
+          type: string
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [credit, debit, transfer]
+        transferToLedgerId:
+          type: string
+          nullable: true
+      required: [date, remark, amount, type]
+
+    UpdateEntryInput:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        remark:
+          type: string
+        amount:
+          type: number
+
+    LedgerSummary:
+      type: object
+      properties:
+        totalCredit:
+          type: number
+        totalDebit:
+          type: number
+        balance:
+          type: number
+        entryCount:
+          type: integer
+        openingBalance:
+          type: number
+      required: [totalCredit, totalDebit, balance, entryCount, openingBalance]
+
+    FifoBill:
+      type: object
+      properties:
+        entryId:
+          type: string
+        date:
+          type: string
+          format: date
+        remark:
+          type: string
+        originalAmount:
+          type: number
+        paidAmount:
+          type: number
+        remainingAmount:
+          type: number
+        isFullyPaid:
+          type: boolean
+      required: [entryId, date, remark, originalAmount, paidAmount, remainingAmount, isFullyPaid]
+
+    FifoStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        oldestUnpaidBill:
+          $ref: "#/components/schemas/FifoBill"
+          nullable: true
+        bills:
+          type: array
+          items:
+            $ref: "#/components/schemas/FifoBill"
+        totalOutstanding:
+          type: number
+      required: [enabled, bills, totalOutstanding]
+
+    Overview:
+      type: object
+      properties:
+        totalLedgers:
+          type: integer
+        totalOutstanding:
+          type: number
+        ledgersOwingMe:
+          type: integer
+        ledgersIOweThem:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            type: object
+            properties:
+              ledgerId:
+                type: string
+              ledgerName:
+                type: string
+              entryId:
+                type: string
+              date:
+                type: string
+              remark:
+                type: string
+              amount:
+                type: number
+              type:
+                type: string
+            required: [ledgerId, ledgerName, entryId, date, remark, amount, type]
+      required: [totalLedgers, totalOutstanding, ledgersOwingMe, ledgersIOweThem, recentActivity]
